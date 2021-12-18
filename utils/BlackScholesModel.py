@@ -1,3 +1,6 @@
+import numpy as np
+import scipy.stats as scistat
+
 def d1(S, K, T, r, q, sigma):
     return (np.log(S/K) + (r-q + sigma*sigma/2)*T)/(sigma*np.sqrt(T))
 
@@ -58,7 +61,6 @@ class Call:
 class Put:
     def __init__(self, S, K, T, r, q, sigma):
         self.params = {'S':S,'K':K,'T':T,'r':r,'q':q,'sigma':sigma}
-
         self.d1 = d1(S, K, T, r, q, sigma)
         self.d2 = d2(S, K, T, r, q, sigma)
         self.exp_q = np.exp(-q*T)

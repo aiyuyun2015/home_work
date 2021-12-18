@@ -1,61 +1,6 @@
 import numpy as np
-from collections import deque
-import matplotlib.pyplot as plt
-from threading import Thread
-import scipy.stats as si
-import sympy as sy
-from sympy.stats import Normal, cdf
-from sympy import init_printing
-import scipy.stats
-import scipy.stats as scistat
-import pandas as pd
-from functools import partialmethod
-import warnings
-from CompressedTree import CompressedTree
-
-
-def call_payoff(x, K):
-    return np.maximum(x - K, 0)
-
-
-def put_payoff(x, K):
-    return np.maximum(K - x, 0)
-
-
-def first_order_derivative(up, down, shift):
-    return (up - down) / (2 * shift)
-
-
-def newtons(f, fprime, target, err=1e-3, start=0.25, max_iter=100):
-    x1 = start
-    counter = 0
-    estimated = f(x1)
-    while np.abs(estimated - target) > err:
-        price, vega = f(x1), fprime(x1)
-        x2 = x1 - (price - target) / vega
-        x1 = x2
-        counter += 1
-        if counter > max_iter:
-            warnings.warn("Iteration reach max_iter%d " % max_iter)
-            return x1
-    return x1
-
-
-def bisection(f, target, start=1e-3, end=1, err=1e-3, max_iter=100):
-    mid = (start + end) / 2.0
-    counter = 0
-    while np.abs(f(mid) - target) > err:
-        if counter > max_iter:
-            warnings.warn("Iteration reach max_iter%d" % max_iter)
-            return mid
-        if f(mid) > target:
-            end = mid
-        else:
-            start = mid
-        mid = (start + end) / 2.0
-        counter += 1
-    return mid
-
+from utils.CompressedTree import CompressedTree
+from utils.utils import call_payoff, first_order_derivative, bisection
 
 class TrinomialTreeModel:
     def __init__(self, S, K, T, r, q, sigma=None, C=None,
@@ -72,6 +17,14 @@ class TrinomialTreeModel:
         self.payoff = payoff
         self.op_tree = np.zeros([1 + self.n, 2 * self.n + 1])
         self.early_optimal = None
+        self.dt = None
+        self.u = None
+        self.d = None
+        self.m = None
+        self.p_u = None
+        self.p_d = None
+        self.p_m = None
+        self.underlying = None
 
     @staticmethod
     def specify_condition(price_tree, K, payoff):
@@ -103,8 +56,7 @@ class TrinomialTreeModel:
         print(self.d, self.u)
 
     def calc_underlying_price_tree(self):
-        self.underlying = CompressedTree(self.n, self.d,
-                                         self.S)
+        self.underlying = CompressedTree(self.n, self.d, self.S)
 
     def adjust_american(self, i, j):
         exercied = self.payoff(self.underlying[i, j], self.K)
@@ -223,6 +175,3 @@ class TrinomialTreeModel:
         hedges = {'price': self.npv(), 'delta': self.delta(shift), 'gamma': self.gamma_approx(),
                 'theta': self.theta(shift), 'rho': self.rho(shift), 'vega': self.vega(shift)}
         return hedges
-import os
-
-print(os.path.dirname(os.path.abspath(__file__)))
