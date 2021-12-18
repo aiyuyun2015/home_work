@@ -3,7 +3,7 @@ from utils.WriteOut import save_implied_vol, save_am_call_put, save_euro_call_pu
 
 def main():
 
-    # Compute euro call and put, greaks from BS, trinomial tree model, comparing with R results
+    # Compute euro call and put, greeks from BS, trinomial tree model, comparing with R results
     print("Save euro result...")
     save_euro_call_put('euro_call_put.csv')
 
