@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 import socket
-import base64
-import hashlib
 import select
 import time
 import multiprocessing
@@ -34,9 +32,9 @@ def ipc_queue_receive(mq, ipc_q):
     param.message_queues = mq
     param.ipc_queue = ipc_q
     while True:
-        info = param.ipc_queue.get(block=True)
-        fd = int(info[0])
-        msg = info[1]
+        data = param.ipc_queue.get(block=True)
+        fd = int(data[0])
+        msg = data[1]
         if fd in param.message_queues.keys():
             param.message_queues[fd].put(msg)
 
@@ -44,7 +42,6 @@ def ipc_queue_receive(mq, ipc_q):
 def start_socket_select_server(mq, client_socket_fd_map):
 
     m = multiprocessing.Manager()
-
     param.message_queues = mq
     param.inputs = []
     param.outputs = []
