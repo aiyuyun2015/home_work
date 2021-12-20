@@ -33,7 +33,6 @@ def web_socket_init():
 def ipc_queue_receive(mq, ipc_q):
     param.message_queues = mq
     param.ipc_queue = ipc_q
-    print('IPC Receive')
     while True:
         info = param.ipc_queue.get(block=True)
         fd = int(info[0])
@@ -74,10 +73,8 @@ def start_socket_select_server(mq, client_socket_fd_map):
                 param.message_queues[conn.fileno()] = q
             else:
                 if s not in param.outputs and s in param.inputs:
-                    # 与新连接的客户端socket握手
                     data = s.recv(1024)
                     if data:
-                        # 将客户端socket放入select写监听列表
                         if s not in param.outputs:
                             param.outputs.append(s)
                             param.client_socket_fd_map[s.fileno()] = s
@@ -92,8 +89,7 @@ def start_socket_select_server(mq, client_socket_fd_map):
                         if param.client_socket_heartbeat_map[s.fileno()]['c'] > 0:
                             param.client_socket_heartbeat_map[s.fileno()]['c'] -= 1
                     else:
-                        disconnect(s.fileno(),param.client_socket_fd_map)
-                        print('Client disconnected')
+                        disconnect(s.fileno(), param.client_socket_fd_map)
 
         while True:
             write_doing_flag = True
@@ -129,9 +125,11 @@ def start_socket_select_server(mq, client_socket_fd_map):
                     param.client_socket_fd_map[k].send(msg.encode())
                     param.client_socket_heartbeat_map[k]['c'] += 1
 
+
 def disconnect(fd, fd_map):
-    print('client [%s] closed' % fd)
     if fd in fd_map:
+        print('client [%s] closed' % fd)
+        print('Client disconnected')
         sock = fd_map[fd]
     else:
         return
@@ -148,6 +146,7 @@ def disconnect(fd, fd_map):
     elif len(param.inputs) > 0:
         param.inputs.pop()
     sock.close()
+
 
 if __name__ == '__main__':
     param.m = multiprocessing.Manager()
