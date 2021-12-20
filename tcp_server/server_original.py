@@ -111,21 +111,21 @@ def start_socket_select_server(mq, client_socket_fd_map):
                     # 与新连接的客户端socket握手
                     data = s.recv(1024)
                     if data:
-                        print('handshake from [%s]' % s.getpeername()[0])
-                        headers = get_headers(data)
-                        response_tpl = "HTTP/1.1 101 Switching Protocols\r\n" \
-                                       "Upgrade:websocket\r\n" \
-                                       "Connection:Upgrade\r\n" \
-                                       "Sec-WebSocket-Accept:%s\r\n" \
-                                       "WebSocket-Location:ws://%s%s\r\n\r\n"
-
-                        magic_string = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
-                        value = headers['Sec-WebSocket-Key'] + magic_string
-
-                        ac = base64.b64encode(hashlib.sha1(value.encode('utf-8')).digest())
-                        response_str = response_tpl % (ac.decode('utf-8'), headers['Host'], headers['url'])
-
-                        s.send(bytes(response_str, encoding='utf-8'))
+                        # print('handshake from [%s]' % s.getpeername()[0])
+                        # headers = get_headers(data)
+                        # response_tpl = "HTTP/1.1 101 Switching Protocols\r\n" \
+                        #                "Upgrade:websocket\r\n" \
+                        #                "Connection:Upgrade\r\n" \
+                        #                "Sec-WebSocket-Accept:%s\r\n" \
+                        #                "WebSocket-Location:ws://%s%s\r\n\r\n"
+                        #
+                        # magic_string = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
+                        # value = headers['Sec-WebSocket-Key'] + magic_string
+                        #
+                        # ac = base64.b64encode(hashlib.sha1(value.encode('utf-8')).digest())
+                        # response_str = response_tpl % (ac.decode('utf-8'), headers['Host'], headers['url'])
+                        #
+                        # s.send(bytes(response_str, encoding='utf-8'))
 
                         # 将客户端socket放入select写监听列表
                         if s not in gl.outputs:
@@ -205,14 +205,22 @@ def remove_connection(fd, fd_map):
     :return:
     '''
     print('client [%s] closed' % fd)
-    sock = fd_map[fd]
-    gl.outputs.remove(sock)
+    if fd in fd_map:
+        sock = fd_map[fd]
+    else:
+        return
+    if sock in gl.outputs:
+        gl.outputs.remove(sock)
+    elif len(gl.outputs) > 0:
+        gl.outputs.pop()
+    if fd in gl.message_queues: del gl.message_queues[fd]
+    if fd in gl.client_socket_fd_map: del gl.client_socket_fd_map[fd]
+    if fd in gl.client_socket_heartbeat_map: del gl.client_socket_heartbeat_map[fd]
 
-    del gl.message_queues[fd]
-    del gl.client_socket_fd_map[fd]
-    del gl.client_socket_heartbeat_map[fd]
-
-    gl.inputs.remove(sock)
+    if sock in gl.inputs:
+        gl.inputs.remove(sock)
+    elif len(gl.inputs) > 0:
+        gl.inputs.pop()
     sock.close()
 
 def get_headers(data):
