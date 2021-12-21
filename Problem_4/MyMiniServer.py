@@ -94,7 +94,7 @@ class MiniServer:
                             self.outputs.append(s)
                     # client send empty to server when it's disconnected
                     else:
-                        logging.info('client {} disconnect, closing.'.format(client_address))
+                        logging.info('client {} disconnect, closing.'.format(s.getpeername()))
                         self.disconnect(s)
 
             for s in writable:
@@ -111,12 +111,12 @@ class MiniServer:
                     curr = time.time()
                     if curr - self.last_write_time[s] > self.heartbeat_interval:
                         logging.info("haven't receive data from {} for more than  {}s".
-                              format(client_address, self.heartbeat_interval))
+                              format(s.getpeername(), self.heartbeat_interval))
                         send_data = self.heartbeat_msg
                     else:
                         continue
 
-                logging.info('send msg [{}] to {}'.format(send_data.decode(), client_address))
+                logging.info('send msg [{}] to {}'.format(send_data.decode(), s.getpeername()))
                 send_ret = s.send(send_data)
 
                 # succeed when client replies
