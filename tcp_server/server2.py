@@ -3,6 +3,13 @@ import select
 import socket
 import time
 from collections import defaultdict
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+)
 
 try:
     import queue
@@ -34,11 +41,10 @@ class MiniServer:
 
         # Bind the socket to the port
         server_address = (self.ip, self.port)
-        print('starting up on %s port %s' % server_address)
+        logging.info('starting up on {} port {}'.format( server_address[0], server_address[1]))
         self.server.bind(server_address)
         # Listen for incoming connections
         self.server.listen(self.max_clients)
-
         # Sockets from which we expect to read
         self.inputs = [self.server]
 
@@ -53,7 +59,7 @@ class MiniServer:
     def run(self):
         self.connect()
         count = 0
-        print("waiting for connect...")
+        logging.info("waiting for connect...")
 
         while self.inputs:
             count += 1
@@ -64,7 +70,7 @@ class MiniServer:
                 if s is self.server:
                     # A "readable" socket is ready to accept a connection
                     connection, client_address = s.accept()
-                    print('connection from', client_address)
+                    logging.info('connection from {}'.format( client_address))
                     # this is connection not server
                     connection.setblocking(0)
                     self.inputs.append(connection)
@@ -74,21 +80,21 @@ class MiniServer:
                     try:
                         data = s.recv(1024)
                     except:
-                        print("disconnected.")
+                        logging.info("disconnected.")
                         self.disconnect(s)
                         writable = []
                         continue
                     # client send msg to server
                     if data != b'':
                         # A readable client socket has data
-                        print ('received msg[{}] from {}\n'.format(data.decode(), s.getpeername()))
+                        logging.info ('received msg[{}] from {}'.format(data.decode(), s.getpeername()))
                         self.message_queues[s].put(data)
                         # Add output channel for response
                         if s not in self.outputs:
                             self.outputs.append(s)
                     # client send empty to server when it's disconnected
                     else:
-                        print('client {} disconnect, closing.'.format(client_address))
+                        logging.info('client {} disconnect, closing.'.format(client_address))
                         self.disconnect(s)
 
             for s in writable:
@@ -104,13 +110,13 @@ class MiniServer:
                     time.sleep(self.heartbeat_rate)
                     curr = time.time()
                     if curr - self.last_write_time[s] > self.heartbeat_interval:
-                        print("haven't receive data from {} for more than  {}s".
+                        logging.info("haven't receive data from {} for more than  {}s".
                               format(client_address, self.heartbeat_interval))
                         send_data = self.heartbeat_msg
                     else:
                         continue
 
-                print('send msg [{}] to {}\n'.format(send_data.decode(), client_address))
+                logging.info('send msg [{}] to {}'.format(send_data.decode(), client_address))
                 send_ret = s.send(send_data)
 
                 # succeed when client replies
@@ -120,12 +126,12 @@ class MiniServer:
                 else:
                     self.failed_connection[s] += 1
                     if self.failed_connection[s] > self.max_failure:
-                        print("Client no response, disconnect")
+                        logging.info("Client no response, disconnect")
                         self.disconnect(s)
 
             # # Handle "exceptional conditions"
             for s in exceptional:
-                print ('exception condition on', s.getpeername())
+                logging.error('exception condition on'+s.getpeername())
                 # Stop listening for input on the connection
                 self.inputs.remove(s)
                 if s in self.outputs:
