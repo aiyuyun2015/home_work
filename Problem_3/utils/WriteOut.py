@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 from utils.utils import call_payoff, put_payoff
 from utils.BlackScholesModel import Call, Put
 from utils.TrinomialModel import TrinomialTreeModel
@@ -141,7 +142,7 @@ def save_implied_vol(filename):
     dfs.set_index('true_sigma').to_csv(filename)
 
 
-def save_convergence_plots():
+def save_convergence_plots(path):
 
     def util_convergence_plot(steps, results, black_schole, test_input):
         plt.plot(steps, results, label='Trinomial tree model')
@@ -161,7 +162,10 @@ def save_convergence_plots():
         prefix = "_".join([str(key)+"_"+str(val) for
                            key,val in test_input.items()])
 
-        plt.savefig(prefix+'.jpg', bbox_inches='tight', dpi=150)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        output = os.path.join(path, prefix + '.jpg')
+        plt.savefig(output, bbox_inches='tight', dpi=150)
         if False:
             plt.show()
         plt.figure().clear()
