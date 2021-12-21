@@ -2,8 +2,6 @@
 import select
 import socket
 import time
-from time import sleep
-import multiprocessing
 from collections import defaultdict
 
 try:
@@ -27,6 +25,7 @@ class MiniServer:
         self.heartbeat_interval = 10
         self.failed_connection = defaultdict(int)
         self.max_failure = 1
+        self.server = None
 
     def connect(self):
         # Create a TCP/IP
@@ -35,7 +34,7 @@ class MiniServer:
 
         # Bind the socket to the port
         server_address = (self.ip, self.port)
-        print ('starting up on %s port %s' % server_address)
+        print('starting up on %s port %s' % server_address)
         self.server.bind(server_address)
         # Listen for incoming connections
         self.server.listen(self.max_clients)
@@ -43,16 +42,13 @@ class MiniServer:
         # Sockets from which we expect to read
         self.inputs = [self.server]
 
-
     def disconnect(self, s):
         if s in self.outputs:
             self.outputs.remove(s)
             self.inputs.remove(s)
             s.close()
-
             # Remove message queue
             del self.message_queues[s]
-
 
     def run(self):
         self.connect()
@@ -62,10 +58,6 @@ class MiniServer:
         while self.inputs:
             count += 1
             # Wait for at least one of the sockets to be ready for processing
-            # print ('waiting for the next event')
-            #print("iteration{}".format(count))
-            #print(self.inputs)
-            #print("waiting for connect...")
             readable, writable, exceptional = select.select(self.inputs, self.outputs, self.inputs)
             # Handle inputs
             for s in readable:
@@ -76,11 +68,9 @@ class MiniServer:
                     # this is connection not server
                     connection.setblocking(0)
                     self.inputs.append(connection)
-
                     # Give the connection a queue for data we want to send
                     self.message_queues[connection] = queue.Queue()
                 else:
-                    #print("Ready for reading client's data")
                     try:
                         data = s.recv(1024)
                     except:
@@ -98,19 +88,14 @@ class MiniServer:
                             self.outputs.append(s)
                     # client send empty to server when it's disconnected
                     else:
-                        #print("Receiving empty from client")
-                        print ('client {} disconnect, closing.'.format(client_address))
-                        # Stop listening for input on the connection
+                        print('client {} disconnect, closing.'.format(client_address))
                         self.disconnect(s)
 
             for s in writable:
                 # write to client if there are data
                 # otherwise write heart beat
                 # after write, make a record
-                # the curr write - prev write time > interval
-                # remove the list!
                 message_queue = self.message_queues.get(s)
-                send_data = ''
                 if message_queue is None:
                     continue
                 if not message_queue.empty():
@@ -126,9 +111,9 @@ class MiniServer:
                         continue
 
                 print('send msg [{}] to {}\n'.format(send_data.decode(), client_address))
-                # print(s)
                 send_ret = s.send(send_data)
 
+                # succeed when client replies
                 if send_ret > 0:
                     self.last_write_time[s] = time.time()
                     self.failed_connection[s] = 0
@@ -146,12 +131,10 @@ class MiniServer:
                 if s in self.outputs:
                     self.outputs.remove(s)
                 s.close()
-
                 # Remove message queue
                 del self.message_queues[s]
 
 
-
 if __name__ == '__main__':
     server = MiniServer()
-    multiprocessing.Process(target=server.run, args=()).start()
+    server.run()
