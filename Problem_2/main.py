@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import h5py
-
+import os
 
 class Converter():
     def __init__(self):
@@ -49,7 +49,11 @@ def main():
 
     print('sample output', '\n', df.head(3))
     print('columns', '\n', df.columns)
-    df.to_csv("sample.csv", index=False)
+    output_path = 'outputs'
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+    output = os.path.join(output_path, "sample.csv")
+    df.to_csv(output, index=False)
 
     # checksum includes sum of each column in h5, df.sum()
     # returns the sum in the combined dataframe
