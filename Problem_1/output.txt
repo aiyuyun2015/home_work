@@ -1,0 +1,52 @@
+annual return:
+ Portfolio A    0.235454
+Portfolio B    0.037155
+dtype: float64
+annual vol:
+ Portfolio A    3.288006
+Portfolio B    1.388184
+dtype: float64
+maximum drawdown A:-0.18, B:-0.27
+
+Portfolio A: sharpe=0.94
+Portfolio B: sharpe=0.18
+Portfolio A: sortino=1.14
+Portfolio B: sortino=0.21
+
+95.0% confidence, A portfolio will not exceed -0.03
+95.0% confidence, B portfolio will not exceed -0.02
+99.0% confidence, A portfolio will not exceed -0.05
+99.0% confidence, B portfolio will not exceed -0.03
+
+
+Spearman corr:0.84
+Pearson corr:0.84
+KstestResult(statistic=0.11730769230769231, pvalue=0.001545819522323865) 
+
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                  pnl_A   R-squared:                       0.713
+Model:                            OLS   Adj. R-squared:                  0.713
+Method:                 Least Squares   F-statistic:                     1285.
+Date:                Wed, 22 Dec 2021   Prob (F-statistic):          2.81e-142
+Time:                        03:45:11   Log-Likelihood:                 1641.6
+No. Observations:                 519   AIC:                            -3279.
+Df Residuals:                     517   BIC:                            -3271.
+Df Model:                           1                                         
+Covariance Type:            nonrobust                                         
+==============================================================================
+                 coef    std err          t      P>|t|      [0.025      0.975]
+------------------------------------------------------------------------------
+Intercept      0.0009      0.000      1.889      0.060   -3.42e-05       0.002
+pnl_B          1.1248      0.031     35.846      0.000       1.063       1.186
+==============================================================================
+Omnibus:                        2.189   Durbin-Watson:                   1.967
+Prob(Omnibus):                  0.335   Jarque-Bera (JB):                2.224
+Skew:                          -0.124   Prob(JB):                        0.329
+Kurtosis:                       2.798   Cond. No.                         69.7
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified. 
+
+Chi-square: Dependent (reject H0)
