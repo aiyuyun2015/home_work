@@ -1,3 +1,4 @@
+Serve:
 2021-12-22 04:49:27.078 INFO MyMiniServer - connect: starting up on localhost port 8090 --> start communication
 2021-12-22 04:49:27.078 INFO MyMiniServer - run: waiting for connect...
 2021-12-22 04:49:45.128 INFO MyMiniServer - run: connection from ('127.0.0.1', 62121) ---> client1 connected
@@ -22,3 +23,21 @@
 2021-12-22 04:50:39.432 INFO MyMiniServer - run: received msg[hello~] from ('127.0.0.1', 62134)  --> got second msg from 3
 2021-12-22 04:50:39.432 INFO MyMiniServer - run: send msg [hello~] to ('127.0.0.1', 62134)  --> send second msg back to 3
 2021-12-22 04:50:42.433 INFO MyMiniServer - run: client ('127.0.0.1', 62134) disconnect, closing. --> all clients disconnect from their sides, server waiting...
+
+
+Client 1:
+connecting to localhost port 8090
+('127.0.0.1', 62121): received from server, msg [hello~]  --> received the hello msg back from the server
+('127.0.0.1', 62121): received from server, msg [hello~] --> received the second hello msg back
+('127.0.0.1', 62121): received from server, msg [heart beat test from server] --> the heart beat msg from server, the client will be shutdown by ctrl+c afterward
+
+Client 2:
+connecting to localhost port 8090
+('127.0.0.1', 62124): received from server, msg [hello~]
+('127.0.0.1', 62124): received from server, msg [hello~]
+('127.0.0.1', 62124): received from server, msg [heart beat test from server]
+
+Client 3:
+connecting to localhost port 8090
+('127.0.0.1', 62134): received from server, msg [hello~]
+('127.0.0.1', 62134): received from server, msg [hello~]
