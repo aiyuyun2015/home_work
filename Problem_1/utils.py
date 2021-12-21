@@ -84,7 +84,7 @@ def percentile(ts, q):
     result = ts[floor - 1] + (ts[ceil - 1] - ts[floor - 1]) * (loc - floor)
     return result
 
-def plot_hist(pnl, label):
+def plot_hist(pnl, label, output):
     figure(figsize=(10, 7))
 
     min_b, max_b = pnl.min(), pnl.max()
@@ -98,4 +98,4 @@ def plot_hist(pnl, label):
     plt.legend()
 
     # To load the display window
-    plt.savefig(label+'.jpg', bbox_inches='tight', dpi=150)
+    plt.savefig(output, bbox_inches='tight', dpi=150)

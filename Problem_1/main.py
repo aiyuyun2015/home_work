@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 from scipy import stats
 from scipy.stats import chi2_contingency
@@ -20,12 +21,15 @@ class Calculator:
         self.pls = ['Portfolio A', 'Portfolio B']
         self.mdd_a, self.date_a = None, None
         self.mdd_b, self.date_b = None, None
+        self.output_path = 'outputs'
 
     def compute(self):
         self.price_a, self.price_b = self.df[self.pls[0]], self.df[self.pls[1]]
         self.pnl_a, self.pnl_b = self.price_a.diff(), self.price_b.diff()
         self.a_ret = self.price_a.pct_change()
         self.b_ret = self.price_b.pct_change()
+        if not os.path.exists(self.output_path):
+            os.makedirs(self.output_path)
 
     def open_file(self, filename):
         self.df = pd.read_csv(filename)
@@ -63,8 +67,10 @@ class Calculator:
         cummax_b = self.price_b.cummax()
         thr_val_b = self.price_b.loc[self.date_b]
 
-        maxdrawdown_utils(self.price_a, cummax_a, self.date_a, thr_val_a, 'mdd_a.jpg')
-        maxdrawdown_utils(self.price_b, cummax_b, self.date_b, thr_val_b, 'mdd_b.jpg')
+        maxdrawdown_utils(self.price_a, cummax_a, self.date_a, thr_val_a,
+                          os.path.join(self.output_path,'mdd_a.jpg'))
+        maxdrawdown_utils(self.price_b, cummax_b, self.date_b, thr_val_b,
+                          os.path.join(self.output_path,'mdd_b.jpg'))
 
     def compute_sharpe(self, r=0.02):
         return sharpe(self.a_ret, r), sharpe(self.b_ret, r)
@@ -76,8 +82,10 @@ class Calculator:
         return robust_percentile(self.pnl_a, q), robust_percentile(self.pnl_b, q)
 
     def make_hists(self):
-        plot_hist(self.pnl_a, 'Portfolio A')
-        plot_hist(self.pnl_b, 'Portfolio B')
+        plot_hist(self.pnl_a, 'Portfolio A',
+                  output=os.path.join(self.output_path, 'hist_b.jpg'))
+        plot_hist(self.pnl_b, 'Portfolio B',
+                  output=os.path.join(self.output_path, 'hist_b.jpg'))
 
     def plot_pnls(self):
         figure(figsize=(10, 7))
@@ -87,7 +95,7 @@ class Calculator:
         plt.ylabel("Daily PnL")
         plt.title("Daily PnLs of Two Portfolios")
         plt.legend()
-        plt.savefig('pnls.jpg', bbox_inches='tight', dpi=150)
+        plt.savefig(os.path.join(self.output_path, 'pnls.jpg'), bbox_inches='tight', dpi=150)
 
     def corr(self):
         spearman_corr = self.pnl_a.corr(self.pnl_b, method='spearman')
@@ -106,7 +114,7 @@ class Calculator:
         plt.ylabel("pnl_a")
         plt.legend(loc='upper left')
         plt.text(0.02, 0 , "pnl_b * {:.2f} + {:.2f} = pnl_a".format(self.k, self.incerpt))
-        plt.savefig('scatter.jpg', bbox_inches='tight', dpi=150)
+        plt.savefig(os.path.join(self.output_path, 'scatter.jpg'), bbox_inches='tight', dpi=150)
 
     def ks_test(self):
         # H0: from same distribution samplings
