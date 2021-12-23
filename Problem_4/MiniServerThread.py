@@ -1,4 +1,5 @@
 import socket
+import sys
 import threading
 import time
 from queue import Queue
@@ -26,6 +27,7 @@ class MiniServerThread:
         self.info = help_info
         self.retry = 5
         self.host = host
+        self.lock = threading.Lock()
 
     def create_socket(self):
         try:
@@ -40,18 +42,11 @@ class MiniServerThread:
             self.s.listen(self.retry)
         except socket.error as msg:
             print("Socket Binding error" + str(msg) + "\n" + "Retrying...")
+            time.sleep(3)
             self.bind_socket()
-
-    def clear_all(self):
-        for i, (_, _) in self.all_connections.items():
-            self.clear_connection(i)
-
-        for i, (_, _) in self.hb_connections.items():
-            self.clear_connection(i)
 
     def accepting_connections(self):
         # close shell connections
-        self.clear_all()
         while True:
             try:
                 conn, address = self.s.accept()
@@ -91,9 +86,12 @@ class MiniServerThread:
                 print("Command not recognized")
 
     def show_client_daemon(self):
+        # fixed the size, no dictionary changed size during iteration
+        self.lock.acquire()
         for i, (conn, address) in self.hb_connections.items():
             results = str(i) + "   " + str(address[0]) + "   " + str(address[1]) + "\n"
             print("----Clients----" + "\n" + results)
+        self.lock.release()
 
     def heart_beat(self):
         hb_failures = defaultdict(int)
@@ -124,6 +122,7 @@ class MiniServerThread:
 
     def list_connections(self):
         to_remove = []
+        self.lock.acquire()
         for i, (conn, address) in self.all_connections.items():
             try:
                 conn.send(str.encode(' '))
@@ -133,6 +132,8 @@ class MiniServerThread:
                 continue
             results = str(i) + "   " + str(address[0]) + "   " + str(address[1]) + "\n"
             print("----Clients----\n{}".format(results))
+        self.lock.release()
+
         for i in to_remove:
             self.clear_connection(i)
 
@@ -166,6 +167,7 @@ class MiniServerThread:
 
     def create_workers(self):
         for _ in range(self.number_of_threads):
+            # use thread to share variables, i.e., self.all_connections, self.hb_connections
             t = threading.Thread(target=self.work)
             # set worker as daemon; daemon terminates after main ends
             t.setDaemon(True)
@@ -188,9 +190,6 @@ class MiniServerThread:
         for x in self.job_number:
             self.queue.put(x)
         self.queue.join()
-
-
-
 
 
 if __name__ == '__main__':

